@@ -508,9 +508,20 @@
     font-size:9px;color:#5a6a90;
     margin-top:6px;letter-spacing:0.5px;
   }
+  .radio-globe-wrap{
+    display:flex;align-items:center;gap:24px;
+    flex-wrap:wrap;
+  }
+  .radio-globe-canvas{
+    width:320px;height:320px;
+    cursor:grab;
+    opacity:0;transition:opacity .8s ease;
+  }
+  .radio-globe-canvas.loaded{opacity:1}
   .radio-countries{
     display:flex;flex-wrap:wrap;gap:8px;
-    margin-top:4px;
+    flex:1;min-width:200px;
+    align-content:flex-start;
   }
   .radio-country{
     display:inline-flex;align-items:center;gap:6px;
@@ -524,6 +535,10 @@
   .radio-country-sessions{
     color:#ffcc66;font-size:10px;
     margin-left:2px;opacity:.7;
+  }
+  @media(max-width:720px){
+    .radio-globe-wrap{justify-content:center}
+    .radio-globe-canvas{width:260px;height:260px}
   }
   .radio-error{
     color:#8a92b0;font-size:12px;
@@ -1168,7 +1183,10 @@
       </div>
       <div class="radio-card radio-card--wide">
         <div class="radio-card-title">Listeners Around the World</div>
-        <div class="radio-countries" id="radio-countries"></div>
+        <div class="radio-globe-wrap">
+          <canvas class="radio-globe-canvas" id="radio-globe" width="640" height="640"></canvas>
+          <div class="radio-countries" id="radio-countries"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1326,6 +1344,10 @@ function renderRadioStats(){
         div.appendChild(sessSpan);
         cEl.appendChild(div);
       });
+
+      /* globe */
+      window._radioCountries=countries;
+      initGlobe(countries);
     })
     .catch(function(){
       var el=document.getElementById("radio-listeners");
@@ -1337,7 +1359,70 @@ function renderRadioStats(){
     });
 }
 
+/* ── Country → lat/lng for globe markers ── */
+var countryCoords={
+  US:[37.09,-95.71],BR:[-14.24,-51.93],GB:[55.38,-3.44],DE:[51.17,10.45],
+  NO:[60.47,8.47],FR:[46.23,2.21],CZ:[49.82,15.47],MX:[23.63,-102.55],
+  HU:[47.16,19.50],SE:[60.13,18.64],CA:[56.13,-106.35],AU:[-25.27,133.78],
+  IN:[20.59,78.96],JP:[36.20,138.25],KR:[35.91,127.77],NL:[52.13,5.29],
+  IT:[41.87,12.57],ES:[40.46,-3.75],PL:[51.92,19.15],PT:[39.40,-8.22],
+  CH:[46.82,8.23],AT:[47.52,14.55],BE:[50.50,4.47],FI:[61.92,25.75],
+  DK:[56.26,9.50],IE:[53.14,-7.69],RO:[45.94,24.97],BG:[42.73,25.49],
+  HR:[45.10,15.20],SK:[48.67,19.70],SI:[46.15,14.99],EE:[58.60,25.01],
+  LV:[56.88,24.60],LT:[55.17,23.88],GR:[39.07,21.82],TR:[38.96,35.24],
+  UA:[48.38,31.17],RU:[61.52,105.32],ZA:[-30.56,22.94],IL:[31.05,34.85],
+  AE:[23.42,53.85],SA:[23.89,45.08],EG:[26.82,30.80],NG:[9.08,8.68],
+  KE:[-0.02,37.91],AR:[-38.42,-63.62],CL:[-35.68,-71.54],CO:[4.57,-74.30],
+  PE:[-9.19,-75.02],PH:[12.88,121.77],TH:[15.87,100.99],VN:[14.06,108.28],
+  MY:[4.21,101.98],SG:[1.35,103.82],ID:[-0.79,113.92],TW:[23.70,120.96],
+  HK:[22.40,114.11],NZ:[-40.90,174.89],PK:[30.38,69.35],BD:[23.68,90.36]
+};
+
+/* ── COBE globe ── */
+function initGlobe(countries){
+  var canvas=document.getElementById("radio-globe");
+  if(!canvas||typeof createGlobe==="undefined")return;
+
+  var maxSessions=Math.max.apply(null,countries.map(function(c){return c.sessions}))||1;
+  var markers=[];
+  countries.forEach(function(c){
+    var coords=countryCoords[c.country_code];
+    if(!coords)return;
+    var size=0.03+0.12*(c.sessions/maxSessions);
+    markers.push({location:coords,size:size});
+  });
+
+  var phi=0;
+  var globe=createGlobe(canvas,{
+    devicePixelRatio:2,
+    width:640,
+    height:640,
+    phi:0,
+    theta:0.15,
+    dark:1,
+    diffuse:1.2,
+    mapSamples:16000,
+    mapBrightness:6,
+    baseColor:[0.05,0.05,0.15],
+    markerColor:[0.45,0.82,1],
+    glowColor:[0.08,0.1,0.2],
+    markers:markers,
+    onRender:function(state){
+      state.phi=phi;
+      phi+=0.003;
+    }
+  });
+  canvas.classList.add("loaded");
+}
+
 renderRadioStats();
+</script>
+<script type="module">
+import createGlobe from "https://cdn.skypack.dev/cobe";
+window.createGlobe=createGlobe;
+/* Re-init globe if stats already loaded */
+var c=document.getElementById("radio-countries");
+if(c&&c.children.length>0)initGlobe(window._radioCountries||[]);
 </script>
 
 </body>
